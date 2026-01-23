@@ -7,11 +7,6 @@ Visualize your local Git contributions in Python Dulwich
 # then run
 pip install dulwich rich
 
-python main.py # help
+python main.py # Run
 
-# add ALL repos in a folder
-python main.py --add <path/to/repo>
-
-# see contribution tiles
-python main.py --email <your_email@gmail.com>
 ```
