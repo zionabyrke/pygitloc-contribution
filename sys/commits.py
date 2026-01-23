@@ -1,48 +1,84 @@
-from collections import defaultdict
-from datetime import datetime, timedelta, date
-from typing import Dict, Set
-
+from collections import defaultdict, OrderedDict
 from dulwich.repo import Repo
-from dulwich.objects import Commit
+from dulwich.walk import Walker
+from datetime import datetime, timezone, date, timedelta
+from dateutil.relativedelta import relativedelta
 
-DAYS_BACK = 183  # ~6 months
-
-def collect_commits(repo_path: str, email: str) -> Dict[date, int]:
+def read_commit_dates(repo_path="C://Users//Renz//Documents"):
+    '''
+    Returns a list of datetime.date objects for all commits in the repo
+    '''
     repo = Repo(repo_path)
-    since = datetime.utcnow() - timedelta(days=DAYS_BACK)
+    walker = Walker(repo.object_store, [repo.head()])
+    today = date.today()
+    cutoff = today - relativedelta(months=6)
+    dates = []
 
-    # initializations
-    daily_counts: Dict[date, int] = defaultdict(int)
-    seen_commits: Set[bytes] = set()
+    for entry in walker:
+        commit = entry.commit
+        dt = datetime.fromtimestamp(
+            commit.commit_time, timezone.utc
+        ).date()
 
-    for ref in repo.get_refs().values():
-        try:
-            obj = repo[ref]
-        except KeyError:
-            continue
+        if dt >= cutoff:
+            dates.append(dt)
+    return dates
 
-        stack = [obj]
-        while stack:
-            commit = stack.pop()
-            if not isinstance(commit, Commit):
-                continue # if invalid
+def aggregate_by_day(commit_dates):
+    '''
+    Input: list[date]
+    Output: dict[date] -> int
+    '''
+    counts = defaultdict(int)
+    for d in commit_dates:
+        counts[d] += 1
 
-            if commit.id in seen_commits: # tracks commits in bytes
-                continue
-            seen_commits.add(commit.id)
+    return dict(counts)
 
-            authored_time = datetime.utcfromtimestamp(commit.commit_time)
-            if authored_time < since: 
-                continue # skips not within timeframe
 
-            author = commit.author.decode("utf-8", errors="ignore")
-            if f"<{email}>" in author: # compare str to utf-8
-                daily_counts[authored_time.date()] += 1 # tallying
 
-            for parent in commit.parents:
-                try:
-                    stack.append(repo[parent])
-                except KeyError:
-                    continue
+def group_weeks_by_month(weeks):
+    '''
+    Groups week columns by the month they belong to
+    Uses the Monday of each week as the canonical date
+    '''
+    months = OrderedDict()
+    for week in weeks:
+        month_key = week[0].strftime("%Y-%m")
+        if month_key not in months:
+            months[month_key] = []
+        months[month_key].append(week)
 
-    return dict(daily_counts)
+    return months
+
+
+def start_of_week(d):
+    return d - timedelta(days=d.weekday())
+
+
+def build_calendar_grid(contribs):
+    '''
+    Output:
+    {
+      "weeks": [
+         [date, date, date, date, date, date, date],
+         ...
+      ]
+    }
+    '''
+    if not contribs:
+        return []
+
+    first_day = min(contribs)
+    last_day = max(contribs)
+    start = start_of_week(first_day)
+    end = start_of_week(last_day) + timedelta(days=6)
+    weeks = []
+    current = start
+
+    while current <= end:
+        week = [current + timedelta(days=i) for i in range(7)]
+        weeks.append(week)
+        current += timedelta(days=7)
+
+    return weeks

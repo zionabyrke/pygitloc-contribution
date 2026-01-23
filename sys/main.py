@@ -1,28 +1,9 @@
-import argparse
-from scanner import find_git_repos
-from storage import load_repos, save_repos
-from commits import collect_commits
-from merge import merge_stats
-from intensity import intensity_level
-from heatmap import render_heatmap
+from commits import read_commit_dates, aggregate_by_day, build_calendar_grid
+from heatmap import render_terminal
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--add", "-a", help="Scan folder for Git repos")
-parser.add_argument("--email", "-e", help="Author email")
-args = parser.parse_args()
 
-if args.add:
-    repos = find_git_repos(args.add)
-    save_repos(repos)
-    print(f"Added {len(repos)} repositories.")
+commits = read_commit_dates(".")
+daily = aggregate_by_day(commits)
+weeks = build_calendar_grid(daily)
 
-elif args.email:
-        stats = [
-            collect_commits(repo, args.email)
-            for repo in load_repos()
-        ]
-        merged = merge_stats(stats)
-        render_heatmap(merged)
-
-else:
-    parser.print_help()
+render_terminal(weeks, daily)

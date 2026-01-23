@@ -1,35 +1,31 @@
-from datetime import date, timedelta
-from typing import Dict
 from rich.console import Console
 from rich.text import Text
-from intensity import intensity_level
+from commits import group_weeks_by_month
 
-console = Console()
-COLOR_MAP = {
-    0: "grey23",
-    1: "green4",
-    2: "green3",
-    3: "green1",
-    4: "green",
-}
 
-def render_heatmap(data: Dict[date, int]) -> None:
-    today = date.today()
-    start = today - timedelta(days=183) # 6 months
-    week = []
-    current = start
+def render_terminal(weeks, contribs):
+    console = Console()
+    months = group_weeks_by_month(weeks)
 
-    console.print("\n[bold]Git Contribution[/bold]\n")
-    while current <= today:
-        count = data.get(current, 0)
-        level = intensity_level(count)
-        color = COLOR_MAP[level]
+    day_labels = ["Mon", "", "Wed", "", "Fri", "", ""]
+    console.print("\nGit Contributions (Last 6 Months)\n")
 
-        week.append(Text("■ ", style=color))
-        if current.weekday() == 6: # Sunday
-            console.print(*week)
-            week = []
-        current += timedelta(days=1)
+    # month header
+    header = "     "
+    for month, month_weeks in months.items():
+        label = month_weeks[0][0].strftime("%b %Y")
+        width = len(month_weeks) * 4
+        header += label.center(width)
+    console.print(header)
 
-    if week:
-        console.print(*week)
+    # rows
+    for day_index in range(7):
+        row = Text(f"{day_labels[day_index]:>4} ")
+
+        for month_weeks in months.values():
+            for week in month_weeks:
+                d = week[day_index]
+                count = contribs.get(d, 0)
+                cell = f"{count:>3} "
+                row.append(cell)
+        console.print(row)
